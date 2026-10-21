@@ -26,6 +26,24 @@ public class BiliRearActivity extends Activity {
     private WebChromeClient.CustomViewCallback fullscreenCallback;
     private String adapter = "";
 
+    private boolean exiting;
+
+    @Override public void finish() {
+        if (exiting) return;
+        exiting = true;
+        android.content.Intent intent = new android.content.Intent(this, MainActivity.class);
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        intent.putExtra("restoreRearScreen", true);
+        android.app.ActivityOptions options = android.app.ActivityOptions.makeBasic();
+        options.setLaunchDisplayId(0);
+        try {
+            startActivity(intent, options.toBundle());
+        } catch (Exception e) {
+            Toast.makeText(this, "请回到MRSS点击恢复背屏", Toast.LENGTH_LONG).show();
+        }
+        finishAndRemoveTask();
+    }
+
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         // Refuse a silent main-display fallback by the device's display policy.

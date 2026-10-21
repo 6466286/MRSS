@@ -357,26 +357,19 @@ public class TaskService extends ITaskService.Stub {
             String startCmd = "am start --display 1 -n com.xiaomi.subscreencenter/.SubScreenLauncher";
 
             ProcessBuilder pb = new ProcessBuilder("sh", "-c", startCmd);
+            pb.redirectErrorStream(true);
             Process process = pb.start();
-            
-            BufferedReader reader = new BufferedReader(
-                new InputStreamReader(process.getInputStream()), 8192
-            );
-            
-            String line;
-            while ((line = reader.readLine()) != null) {
-
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) output.append(line).append('\n');
             }
-            reader.close();
-            
             int exitCode = process.waitFor();
-            if (exitCode == 0) {
-
-            } else {
-
-            }
-
-            return true;
+            String response = output.toString();
+            boolean success = exitCode == 0 && !response.contains("Error")
+                && !response.contains("Exception") && !response.contains("Permission Denial");
+            if (!success) Log.e(TAG, "Rear launcher failed: " + response);
+            return success;
             
         } catch (Exception e) {
             Log.e(TAG, "❌ EXCEPTION in enableSubScreenLauncher", e);

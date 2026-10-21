@@ -480,7 +480,7 @@ public class RearScreenKeeperService extends Service implements SensorEventListe
                                 .debuggable(false)
                                 .version(1),
                         taskServiceConnection,
-                        true);
+                        false);
             } catch (Exception e) {
                 Log.w(TAG, "Failed to unbind TaskService", e);
             }

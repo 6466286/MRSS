@@ -171,6 +171,10 @@ public class MainActivity extends FlutterActivity {
     private void handleIncomingIntent(Intent intent) {
         if (intent == null) return;
         
+        if (intent.getBooleanExtra("restoreRearScreen", false)) {
+            intent.removeExtra("restoreRearScreen");
+            restoreRearScreen(null, 0);
+        }
         String action = intent.getAction();
         
         // 处理通知Intent
@@ -298,6 +302,66 @@ public class MainActivity extends FlutterActivity {
         Shizuku.removeRequestPermissionResultListener(requestPermissionResultListener);
     }
     
+    private boolean restoringRear;
+
+    private void restoreRearScreen(MethodChannel.Result result, int attempt) {
+        if (attempt == 0) {
+            if (restoringRear) {
+                if (result != null) result.error("BUSY", "正在恢复背屏，请稍候", null);
+                return;
+            }
+            restoringRear = true;
+            stopService(new Intent(this, RearScreenKeeperService.class));
+        }
+        // Allow keeper teardown to release its wake lock and binder connection first.
+        if (attempt == 0 || taskService == null) {
+            bindTaskService();
+            if (attempt < 20) {
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+                    () -> restoreRearScreen(result, attempt + 1), 250);
+                return;
+            }
+            completeRearRestore(result, "Shizuku未连接，请启动并授权后点击恢复背屏");
+            return;
+        }
+        final ITaskService service = taskService;
+        new Thread(() -> {
+            String error = null;
+            try {
+                String task = SwitchToRearTileService.getLastMovedTask();
+                if (task != null && task.contains(":")) {
+                    int id = Integer.parseInt(task.substring(task.lastIndexOf(':') + 1));
+                    if (service.isTaskOnDisplay(id, 1)) {
+                        service.moveTaskToDisplay(id, 0);
+                        if (service.isTaskOnDisplay(id, 1)) {
+                            throw new IllegalStateException("应用仍在背屏，请重试恢复");
+                        }
+                    }
+                }
+                if (!service.enableSubScreenLauncher()) {
+                    throw new IllegalStateException("系统背屏启动失败，请检查Shizuku后重试");
+                }
+                RearScreenBroadcastReceiver.clearLastTask();
+            } catch (Exception e) {
+                error = e.getMessage();
+                if (error == null) error = "恢复失败，请检查Shizuku后重试";
+            }
+            final String message = error;
+            runOnUiThread(() -> completeRearRestore(result, message));
+        }, "restore-rear-screen").start();
+    }
+
+    private void completeRearRestore(MethodChannel.Result result, String error) {
+        restoringRear = false;
+        if (result != null) {
+            if (error == null) result.success(true);
+            else result.error("RESTORE_FAILED", error, null);
+        } else {
+            android.widget.Toast.makeText(this, error == null ? "已请求恢复系统背屏" : error,
+                android.widget.Toast.LENGTH_LONG).show();
+        }
+    }
+
     @Override
     public void configureFlutterEngine(FlutterEngine flutterEngine) {
         super.configureFlutterEngine(flutterEngine);
@@ -307,20 +371,17 @@ public class MainActivity extends FlutterActivity {
                 switch (call.method) {
                     case "openBiliRear": {
                         try {
-                            android.hardware.display.DisplayManager dm =
-                                (android.hardware.display.DisplayManager) getSystemService(DISPLAY_SERVICE);
-                            if (android.os.Build.VERSION.SDK_INT < 26 || dm.getDisplay(1) == null) {
-                                result.error("NO_REAR_DISPLAY", "没有找到可用背屏", null);
+                            Intent intent = getPackageManager().getLaunchIntentForPackage("tv.danmaku.bili");
+                            if (intent == null) {
+                                result.error("BILI_NOT_INSTALLED", "未找到原版哔哩哔哩，请先安装并登录", null);
                                 break;
                             }
-                            android.app.ActivityOptions options = android.app.ActivityOptions.makeBasic();
-                            options.setLaunchDisplayId(1);
-                            Intent intent = new Intent(this, BiliRearActivity.class);
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                            startActivity(intent, options.toBundle());
+                            android.widget.Toast.makeText(this,
+                                "打开后，下拉控制中心，点击「切换至背屏」", android.widget.Toast.LENGTH_LONG).show();
+                            startActivity(intent);
                             result.success(true);
                         } catch (Exception e) {
-                            result.error("BILI_REAR_LAUNCH", "背屏启动失败：" + e.getMessage(), null);
+                            result.error("BILI_LAUNCH", "B站启动失败：" + e.getMessage(), null);
                         }
                         break;
                     }
@@ -564,42 +625,7 @@ public class MainActivity extends FlutterActivity {
                     }
                     
                     case "returnRearAppAndRestart": {
-                        // 重启前先拉回背屏应用
-                        if (taskService != null) {
-                            try {
-                                // 获取最后移动的任务信息
-                                String lastTask = SwitchToRearTileService.getLastMovedTask();
-                                
-                                if (lastTask != null && lastTask.contains(":")) {
-                                    String[] parts = lastTask.split(":");
-                                    int taskId = Integer.parseInt(parts[1]);
-                                    
-                                    // 检查任务是否还在背屏
-                                    boolean onRear = taskService.isTaskOnDisplay(taskId, 1);
-                                    
-                                    if (onRear) {
-                                        // 拉回主屏
-                                        taskService.moveTaskToDisplay(taskId, 0);
-                                        
-                                        // 恢复官方Launcher
-                                        taskService.enableSubScreenLauncher();
-                                        
-                                        result.success(true);
-                                    } else {
-                                        // 没有应用在背屏
-                                        result.success(false);
-                                    }
-                                } else {
-                                    // 没有记录
-                                    result.success(false);
-                                }
-                            } catch (Exception e) {
-                                Log.e(TAG, "Failed to return rear app", e);
-                                result.error("ERROR", e.getMessage(), null);
-                            }
-                        } else {
-                            result.error("ERROR", "TaskService not available", null);
-                        }
+                        restoreRearScreen(result, 0);
                         break;
                     }
                     

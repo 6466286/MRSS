@@ -429,19 +429,18 @@ class _HomePageState extends State<HomePage> {
       await platform.invokeMethod('ensureTaskServiceConnected');
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // 检查是否有应用在背屏
-      final result = await platform.invokeMethod('returnRearAppAndRestart');
-
-      if (result == true) {
-        // 成功返回主屏，退出应用
-        SystemNavigator.pop();
-      } else {
-        // 没有应用在背屏，直接退出
-        SystemNavigator.pop();
-      }
+      await platform.invokeMethod('returnRearAppAndRestart');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已请求恢复系统背屏')),
+      );
     } catch (e) {
-      // 出错也退出
-      SystemNavigator.pop();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e is PlatformException ? (e.message ?? '恢复失败') : '$e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -751,7 +750,7 @@ class _HomePageState extends State<HomePage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.ondemand_video),
-            tooltip: 'B站背屏（网页实验版）',
+            tooltip: '打开原版B站，再用快捷开关投放',
             onPressed: () async {
               try {
                 await platform.invokeMethod('openBiliRear');
@@ -766,7 +765,7 @@ class _HomePageState extends State<HomePage> {
           IconButton(
             icon: const Icon(Icons.restart_alt),
             onPressed: _restartApp,
-            tooltip: '重启软件',
+            tooltip: '退出投放并恢复系统背屏',
           ),
         ],
       ),
