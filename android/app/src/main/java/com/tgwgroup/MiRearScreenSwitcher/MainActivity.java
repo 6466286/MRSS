@@ -54,7 +54,7 @@ public class MainActivity extends FlutterActivity {
             .daemon(false)
             .processNameSuffix("task_service")
             .debuggable(false)
-            .version(1);
+            .version(2);
     
     // Shizuku监听器（关键！）
     private final Shizuku.OnBinderReceivedListener binderReceivedListener = 
@@ -369,6 +369,38 @@ public class MainActivity extends FlutterActivity {
         methodChannel = new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), CHANNEL);
         methodChannel.setMethodCallHandler((call, result) -> {
                 switch (call.method) {
+                    case "applyBiliRearLayout":
+                    case "resetBiliRearLayout": {
+                        final ITaskService service = taskService;
+                        if (service == null) {
+                            result.error("NO_SERVICE", "请启动并授权Shizuku，稍后重试", null);
+                            break;
+                        }
+                        android.hardware.display.DisplayManager dm =
+                            (android.hardware.display.DisplayManager)getSystemService(DISPLAY_SERVICE);
+                        android.view.Display display = dm.getDisplay(1);
+                        if (display == null) {
+                            result.error("NO_DISPLAY", "未找到背屏", null);
+                            break;
+                        }
+                        android.graphics.Point size = new android.graphics.Point();
+                        display.getRealSize(size);
+                        final boolean reset = "resetBiliRearLayout".equals(call.method);
+                        new Thread(() -> {
+                            try {
+                                String error = reset ? service.resetBiliRearLayout()
+                                    : service.applyBiliRearLayout(size.x, size.y);
+                                runOnUiThread(() -> {
+                                    if (error == null || !error.isEmpty()) result.error("LAYOUT_FAILED",
+                                        error == null ? "系统未返回布局结果" : error, null);
+                                    else result.success(true);
+                                });
+                            } catch (Exception e) {
+                                runOnUiThread(() -> result.error("LAYOUT_FAILED", "布局调整失败：" + e.getMessage(), null));
+                            }
+                        }, "bili-rear-layout").start();
+                        break;
+                    }
                     case "openBiliRear": {
                         try {
                             Intent intent = getPackageManager().getLaunchIntentForPackage("tv.danmaku.bili");

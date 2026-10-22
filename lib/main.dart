@@ -444,6 +444,28 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _applyBiliLayout({bool reset = false}) async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+    try {
+      await platform.invokeMethod('ensureTaskServiceConnected');
+      await Future.delayed(const Duration(milliseconds: 500));
+      await platform.invokeMethod(reset ? 'resetBiliRearLayout' : 'applyBiliRearLayout');
+      await _getCurrentRearDpi();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+        reset ? '已请求还原B站窗口' : '已应用260 DPI参考布局，请检查背屏显示和触摸',
+      )));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+        e is PlatformException ? (e.message ?? '布局调整失败') : '$e',
+      ), duration: const Duration(seconds: 8)));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   // V2.2: 加载所有设置
   Future<void> _loadSettings() async {
     try {
@@ -857,6 +879,36 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
 
+                const SizedBox(height: 20),
+
+                Card(
+                  color: Colors.white.withOpacity(0.8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('B站参考布局 · 260 DPI（实验）',
+                          style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 8),
+                        const Text('先把原版B站投放到横向背屏，再应用。按参考图将窗口放在右侧约67%区域。系统可能不支持此窗口模式。'),
+                        const SizedBox(height: 8),
+                        const Text('调整整个B站窗口；页面排版由B站决定。旋转屏幕或进入全屏后若布局变化，请重新应用。'),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 8,
+                          children: [
+                            FilledButton(onPressed: _isLoading ? null : () => _applyBiliLayout(),
+                              child: const Text('应用参考布局')),
+                            OutlinedButton(onPressed: _isLoading ? null : () => _applyBiliLayout(reset: true),
+                              child: const Text('还原B站窗口')),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 20),
 
                 // V15: 背屏DPI调整卡片

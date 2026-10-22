@@ -132,5 +132,7 @@ interface ITaskService {
      */
     boolean executeShellCommand(String cmd) = 20;
     String executeShellCommandWithResult(String cmd) = 21;
+    String applyBiliRearLayout(int width, int height) = 22;
+    String resetBiliRearLayout() = 23;
 }
 

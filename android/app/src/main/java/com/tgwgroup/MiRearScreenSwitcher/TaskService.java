@@ -27,6 +27,25 @@ import java.io.InputStreamReader;
 public class TaskService extends ITaskService.Stub {
     private static final String TAG = "TaskService";
 
+    private final BiliRearLayout biliLayout = new BiliRearLayout();
+
+    @Override public synchronized String applyBiliRearLayout(int width, int height) throws RemoteException {
+        int previous = getCurrentRearDpi();
+        if (previous <= 0) return "无法读取背屏DPI，未更改布局";
+        String error = biliLayout.apply(width, height);
+        if (!error.isEmpty()) return error;
+        if (previous != 260 && (!setRearDpi(260) || getCurrentRearDpi() != 260)) {
+            String restoreError = biliLayout.reset();
+            setRearDpi(previous);
+            return "260 DPI设置失败，已尝试还原" + (restoreError.isEmpty() ? "" : "；" + restoreError);
+        }
+        return "";
+    }
+
+    @Override public synchronized String resetBiliRearLayout() {
+        return biliLayout.reset();
+    }
+
     @Keep
     public TaskService() {
 
@@ -140,6 +159,7 @@ public class TaskService extends ITaskService.Stub {
     @Override
     public boolean moveTaskToDisplay(int taskId, int displayId) throws RemoteException {
         try {
+            if (displayId == 0) biliLayout.restoreTask(taskId);
             long startTime = System.currentTimeMillis();
 
             // 先获取包名

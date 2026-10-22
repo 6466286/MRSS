@@ -44,7 +44,7 @@ public class SwitchToRearTileService extends TileService {
             .daemon(false)
             .processNameSuffix("task_service")
             .debuggable(false)
-            .version(1);
+            .version(2);
 
     private final ServiceConnection taskServiceConnection = new ServiceConnection() {
         @Override
