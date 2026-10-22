@@ -28,10 +28,10 @@ final class BiliRearLayout {
         return (List<ActivityManager.RunningTaskInfo>) api().getMethod("getTasks",
             int.class, boolean.class, boolean.class, int.class).invoke(manager(), 100, false, false, 1);
     }
-    private boolean bili(ActivityManager.RunningTaskInfo task) {
+    private boolean bili(ActivityManager.RunningTaskInfo task) throws Exception {
         ComponentName base = task.baseActivity;
         ComponentName top = task.topActivity;
-        return task.displayId == 1 && base != null && PACKAGE.equals(base.getPackageName())
+        return task.getClass().getField("displayId").getInt(task) == 1 && base != null && PACKAGE.equals(base.getPackageName())
             && top != null && PACKAGE.equals(top.getPackageName());
     }
     private Rect bounds(int id) throws Exception {
