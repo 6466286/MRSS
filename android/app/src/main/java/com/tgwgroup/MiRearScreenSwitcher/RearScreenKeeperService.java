@@ -458,7 +458,7 @@ public class RearScreenKeeperService extends Service implements SensorEventListe
                     .daemon(false)
                     .processNameSuffix("task_service")
                     .debuggable(false)
-                    .version(2);
+                    .version(3);
 
             Shizuku.bindUserService(args, taskServiceConnection);
         } catch (Exception e) {
@@ -478,7 +478,7 @@ public class RearScreenKeeperService extends Service implements SensorEventListe
                                 .daemon(false)
                                 .processNameSuffix("task_service")
                                 .debuggable(false)
-                                .version(2),
+                                .version(3),
                         taskServiceConnection,
                         false);
             } catch (Exception e) {

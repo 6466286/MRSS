@@ -22,6 +22,11 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: node tests/video-url.cjs
+      - name: Check layout diagnostic filtering
+        run: |
+          mkdir -p "$RUNNER_TEMP/layout-tests"
+          javac -d "$RUNNER_TEMP/layout-tests" android/app/src/main/java/com/tgwgroup/MiRearScreenSwitcher/RearLayoutDiagnostics.java tests/java/RearLayoutDiagnosticsTest.java
+          java -cp "$RUNNER_TEMP/layout-tests" com.tgwgroup.MiRearScreenSwitcher.RearLayoutDiagnosticsTest
       - run: flutter build apk --debug --target-platform android-arm64
       - uses: actions/upload-artifact@v5
         with:

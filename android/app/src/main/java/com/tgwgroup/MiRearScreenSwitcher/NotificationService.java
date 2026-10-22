@@ -90,7 +90,7 @@ public class NotificationService extends NotificationListenerService {
             .daemon(false)
             .processNameSuffix("notification_task_service")
             .debuggable(false)
-            .version(2);
+            .version(3);
     
     // TaskService连接
     private final ServiceConnection taskServiceConnection = new ServiceConnection() {

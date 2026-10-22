@@ -68,7 +68,7 @@ public class ScreenRecordService extends Service {
             .daemon(false)
             .processNameSuffix("task_service")
             .debuggable(false)
-            .version(2);
+            .version(3);
     
     private final ServiceConnection taskServiceConnection = new ServiceConnection() {
         @Override

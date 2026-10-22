@@ -54,7 +54,7 @@ public class MainActivity extends FlutterActivity {
             .daemon(false)
             .processNameSuffix("task_service")
             .debuggable(false)
-            .version(2);
+            .version(3);
     
     // Shizuku监听器（关键！）
     private final Shizuku.OnBinderReceivedListener binderReceivedListener = 
@@ -303,6 +303,7 @@ public class MainActivity extends FlutterActivity {
     }
     
     private boolean restoringRear;
+    private String lastBiliLayoutReport = "No layout request in this activity instance";
 
     private void restoreRearScreen(MethodChannel.Result result, int attempt) {
         if (attempt == 0) {
@@ -369,6 +370,45 @@ public class MainActivity extends FlutterActivity {
         methodChannel = new MethodChannel(flutterEngine.getDartExecutor().getBinaryMessenger(), CHANNEL);
         methodChannel.setMethodCallHandler((call, result) -> {
                 switch (call.method) {
+                    case "getBiliLayoutDiagnostics": {
+                        final ITaskService service = taskService;
+                        if (service == null) {
+                            result.error("NO_SERVICE", "请启动并授权Shizuku后重试", null);
+                            break;
+                        }
+                        final String last = lastBiliLayoutReport;
+                        new Thread(() -> {
+                            try {
+                                StringBuilder report = new StringBuilder("MRSS layout diagnostics v3\n");
+                                report.append("Android SDK=").append(Build.VERSION.SDK_INT).append('\n');
+                                android.hardware.display.DisplayManager manager =
+                                    (android.hardware.display.DisplayManager)getSystemService(DISPLAY_SERVICE);
+                                android.view.Display display = manager.getDisplay(1);
+                                if (display != null) {
+                                    android.graphics.Point size = new android.graphics.Point();
+                                    display.getRealSize(size);
+                                    android.util.DisplayMetrics metrics = new android.util.DisplayMetrics();
+                                    display.getRealMetrics(metrics);
+                                    report.append("display=1 size=").append(size.x).append('x').append(size.y)
+                                        .append(" rotation=").append(display.getRotation())
+                                        .append(" dpi=").append(metrics.densityDpi).append('\n');
+                                    if (Build.VERSION.SDK_INT >= 29 && display.getCutout() != null) {
+                                        report.append("cutout=").append(display.getCutout().getBoundingRects()).append('\n');
+                                    }
+                                } else report.append("display=1 missing\n");
+                                report.append("lastRequest: ").append(last).append('\n');
+                                report.append("TASKS\n").append(RearLayoutDiagnostics.filter(
+                                    service.executeShellCommandWithResult("am stack list"), false));
+                                report.append("WINDOWS\n").append(RearLayoutDiagnostics.filter(
+                                    service.executeShellCommandWithResult("dumpsys window windows"), true));
+                                String text = report.toString();
+                                runOnUiThread(() -> result.success(text));
+                            } catch (Exception e) {
+                                runOnUiThread(() -> result.error("DIAGNOSTICS", "读取诊断失败：" + e.getMessage(), null));
+                            }
+                        }, "rear-layout-diagnostics").start();
+                        break;
+                    }
                     case "applyBiliRearLayout":
                     case "resetBiliRearLayout": {
                         final ITaskService service = taskService;
@@ -391,6 +431,9 @@ public class MainActivity extends FlutterActivity {
                                 String error = reset ? service.resetBiliRearLayout()
                                     : service.applyBiliRearLayout(size.x, size.y);
                                 runOnUiThread(() -> {
+                                    lastBiliLayoutReport = "reset=" + reset + " size=" + size.x + "x" + size.y
+                                        + " requestedLeft=" + Math.round(size.x * (503.0 / 1536.0))
+                                        + " result=" + (error == null ? "null" : error.isEmpty() ? "task bounds accepted" : error);
                                     if (error == null || !error.isEmpty()) result.error("LAYOUT_FAILED",
                                         error == null ? "系统未返回布局结果" : error, null);
                                     else result.success(true);

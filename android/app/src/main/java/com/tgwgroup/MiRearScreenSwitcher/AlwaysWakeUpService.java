@@ -38,7 +38,7 @@ public class AlwaysWakeUpService extends Service {
             .daemon(false)
             .processNameSuffix("always_wakeup_task_service")
             .debuggable(false)
-            .version(2);
+            .version(3);
     
     private final ServiceConnection taskServiceConnection = new ServiceConnection() {
         @Override

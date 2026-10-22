@@ -444,6 +444,33 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _showBiliDiagnostics() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+    try {
+      final report = await platform.invokeMethod<String>('getBiliLayoutDiagnostics') ?? '未返回诊断信息';
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (dialogContext) => AlertDialog(
+        title: const Text('背屏布局诊断'),
+        content: SingleChildScrollView(child: SelectableText(report)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('关闭')),
+          TextButton(onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: report));
+            if (!dialogContext.mounted) return;
+            Navigator.pop(dialogContext);
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('已复制，请粘贴到聊天中')));
+          }, child: const Text('复制诊断')),
+        ],
+      ));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _applyBiliLayout({bool reset = false}) async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
@@ -454,7 +481,7 @@ class _HomePageState extends State<HomePage> {
       await _getCurrentRearDpi();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
-        reset ? '已请求还原B站窗口' : '已应用260 DPI参考布局，请检查背屏显示和触摸',
+        reset ? '已请求还原B站窗口' : '系统返回的窗口范围符合设置；若画面仍偏左，请复制背屏诊断',
       )));
     } catch (e) {
       if (!mounted) return;
@@ -903,6 +930,8 @@ class _HomePageState extends State<HomePage> {
                               child: const Text('应用参考布局')),
                             OutlinedButton(onPressed: _isLoading ? null : () => _applyBiliLayout(reset: true),
                               child: const Text('还原B站窗口')),
+                            TextButton(onPressed: _isLoading ? null : _showBiliDiagnostics,
+                              child: const Text('复制背屏诊断')),
                           ],
                         ),
                       ],

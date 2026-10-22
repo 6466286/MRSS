@@ -86,6 +86,14 @@ final class BiliRearLayout {
                 }
             }
             if (!verified) throw new IllegalStateException("系统未接受指定窗口范围");
+            // Xiaomi may reposition a window after its first layout/transition.
+            // An initial matching task rectangle alone is not a stable result.
+            for (int settle = 0; settle < 6; settle++) {
+                Thread.sleep(400);
+                if (!wanted.equals(bounds(taskId))) {
+                    throw new IllegalStateException("系统随后改变了窗口位置");
+                }
+            }
             saved.putIfAbsent(taskId, before);
             return "";
         } catch (Exception e) {
